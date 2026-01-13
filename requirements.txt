@@ -3,3 +3,4 @@ google-genai
 edge-tts
 pydub
 asyncio
+pyaudioop
