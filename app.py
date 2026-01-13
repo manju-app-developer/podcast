@@ -9,24 +9,13 @@ import edge_tts
 from pydub import AudioSegment
 
 # --- CONFIGURATION ---
-# 1. Get API Key from Streamlit Secrets or User Input
-# Ideally set this in .streamlit/secrets.toml
-try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-except:
-    API_KEY = ""  # Will prompt user in UI if missing
-
-# Using the latest fast experimental model
-MODEL_NAME = "gemini-2.0-flash-exp"
-
+# We retrieve the key strictly from secrets. 
+# If it's missing, the app will stop and warn the owner (you).
+MODEL_NAME = "gemini-2.5-flash-preview-09-2025"
 # --- HELPER FUNCTIONS ---
 
 def generate_podcast_script(topic, language, duration_minutes, api_key):
     """Generates the conversation script using Gemini."""
-    if not api_key:
-        st.error("❌ API Key is missing.")
-        return []
-
     client = genai.Client(api_key=api_key)
     
     # Estimate word count (approx 150 words per minute)
@@ -109,7 +98,6 @@ async def create_podcast_audio(script_json, language):
         text = line["text"]
         
         # Determine voice based on speaker tag
-        # We assume Host 1 is usually the first speaker or identified by name
         if "Host 1" in speaker or "Alex" in speaker or "Rahul" in speaker:
             voice = voice_1
         else:
@@ -128,7 +116,6 @@ async def create_podcast_audio(script_json, language):
     for file in valid_files:
         segment = AudioSegment.from_mp3(file)
         combined += segment
-        # Add a tiny natural pause between speakers
         combined += AudioSegment.silent(duration=350) 
     
     # Cleanup temp files
@@ -148,18 +135,20 @@ def main():
     st.title("🎧 AI Podcast Generator")
     st.write("Turn any topic into a professional podcast instantly.")
 
+    # --- SECURITY CHECK ---
+    # The app will stop here if the owner (you) hasn't set the secret key.
+    if "GEMINI_API_KEY" not in st.secrets:
+        st.error("⚠️ Server Configuration Error: API Key missing. Please set GEMINI_API_KEY in Streamlit Secrets.")
+        st.stop()
+    
+    api_key = st.secrets["GEMINI_API_KEY"]
+
     # Sidebar for Configuration
     with st.sidebar:
         st.header("⚙️ Settings")
-        
-        # API Key Input
-        user_api_key = st.text_input("Gemini API Key", type="password", value=API_KEY)
-        if not user_api_key:
-            st.warning("Please enter your Gemini API Key to proceed.")
-            st.markdown("[Get API Key](https://aistudio.google.com/)")
-
         language = st.selectbox("Language", ["English", "Hindi", "Hinglish"])
         duration = st.slider("Duration (Minutes)", 1, 10, 3)
+        st.info("💡 Tip: Longer durations take more time to generate.")
         
     # Main Input Area
     topic = st.text_area("What should the podcast be about?", 
@@ -167,20 +156,18 @@ def main():
     
     generate_btn = st.button("Generate Podcast 🚀", type="primary")
 
-    if generate_btn and topic and user_api_key:
+    if generate_btn and topic:
         
         # 1. Generate Script
         with st.spinner("🧠 Brainstorming the script..."):
-            script = generate_podcast_script(topic, language, duration, user_api_key)
+            script = generate_podcast_script(topic, language, duration, api_key)
         
         if script:
-            # Show the script in an expander
             with st.expander("📝 View Generated Script"):
                 for line in script:
                     st.markdown(f"**{line['speaker']}:** {line['text']}")
             
             # 2. Generate Audio
-            # We use a new event loop for asyncio compatibility in Streamlit
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -192,7 +179,6 @@ def main():
                 
                 st.audio(output_filename, format="audio/mp3")
                 
-                # Download Button
                 with open(output_filename, "rb") as file:
                     st.download_button(
                         label="📥 Download Podcast",
