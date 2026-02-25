@@ -9,7 +9,7 @@ import edge_tts
 from pydub import AudioSegment
 
 # --- CONFIGURATION ---
-MODEL_NAME = "gemini-2.5-flash-preview-09-2025"
+MODEL_NAME = "gemini-2.5-flash"
 
 # --- HELPER FUNCTIONS ---
 
@@ -188,3 +188,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
